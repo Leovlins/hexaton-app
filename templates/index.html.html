@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hexaton - Processador de Vídeos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            margin: auto;
+        }
+        input, select, button {
+            margin: 10px 0;
+            padding: 10px;
+            width: 100%;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #loading {
+            display: none;
+            font-weight: bold;
+            color: #d9534f;
+        }
+        .video-item {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .video-info {
+            text-align: left;
+            flex-grow: 1;
+        }
+        .video-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .video-details {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .download-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .error {
+            color: #d9534f;
+            font-weight: bold;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bem-vindo ao Hexaton</h1>
+    <div class="container">
+        <!-- Upload de Vídeo -->
+        <h2>1️⃣ Envie seu Vídeo</h2>
+        <input type="file" id="videoUpload" accept="video/*">
+        <button onclick="uploadVideo()">Fazer Upload</button>
+        <p id="uploadStatus"></p>
+
+        <!-- Configuração de Processamento -->
+        <h2>2️⃣ Escolha as Configurações</h2>
+        <p><strong>Arquivo Selecionado:</strong> <span id="selectedFile">Nenhum arquivo</span></p>
+
+        <label>Intensidade:</label>
+        <select id="intensidade">
+            <option value="leve">Leve</option>
+            <option value="medio">Médio</option>
+            <option value="intenso">Intenso</option>
+        </select>
+
+        <label>Dimensão:</label>
+        <select id="dimensao">
+            <option value="original">Original</option>
+            <option value="9:16">9:16</option>
+            <option value="16:9">16:9</option>
+        </select>
+
+        <label>Quantidade de Variações:</label>
+        <input type="number" id="quantidade" min="1" max="10" value="1">
+
+        <button onclick="processVideo()">Processar Vídeo</button>
+        <p id="processStatus"></p>
+        <p id="loading">⏳ Processando... Isso pode levar alguns segundos.</p>
+
+        <!-- Baixar Vídeo -->
+        <h2>3️⃣ Baixe suas Variações</h2>
+        <div id="videoList">
+            <p>🔄 Carregando vídeos...</p>
+        </div>
+    </div>
+
+    <script>
+        let uploadedFile = "";
+
+        async function uploadVideo() {
+            let input = document.getElementById("videoUpload").files[0];
+            if (!input) {
+                alert("Selecione um arquivo!");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("file", input);
+
+            try {
+                document.getElementById("uploadStatus").innerHTML = "⏳ Enviando...";
+                
+                let response = await fetch("/upload/", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Erro ${response.status}: ${response.statusText}`);
+                }
+
+                let result = await response.json();
+                if (result.mensagem) {
+                    uploadedFile = input.name;
+                    document.getElementById("selectedFile").innerText = uploadedFile;
+                    document.getElementById("uploadStatus").innerHTML = 
+                        `<span class="success">✅ Upload realizado com sucesso!</span>`;
+                } else {
+                    document.getElementById("uploadStatus").innerHTML = 
+                        `<span class="error">❌ Erro no upload!</span>`;
+                }
+            } catch (error) {
+                console.error("Erro durante o upload:", error);
+                document.getElementById("uploadStatus").innerHTML = 
+                    `<span class="error">❌ Erro no upload: ${error.message}</span>`;
+            }
+        }
+
+        async function processVideo() {
+            if (!uploadedFile) {
+                alert("Primeiro, faça o upload do vídeo!");
+                return;
+            }
+
+            let intensidade = document.getElementById("intensidade").value;
+            let dimensao = document.getElementById("dimensao").value;
+            let quantidade = document.getElementById("quantidade").value;
+            let status = document.getElementById("processStatus");
+            let loading = document.getElementById("loading");
+
+            status.innerHTML = "";
+            loading.style.display = "block";
+
+            try {
+                let response = await fetch(`/processar/?filename=${encodeURIComponent(uploadedFile)}&intensidade=${intensidade}&dimensao=${dimensao}&quantidade=${quantidade}`, {
+                    method: "POST"
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Erro ${response.status}: ${response.statusText}`);
+                }
+
+                let result = await response.json();
+                loading.style.display = "none";
+                
+                if (result.mensagem) {
+                    status.innerHTML = `<span class="success">${result.mensagem}</span>`;
+                } else if (result.erro) {
+                    status.innerHTML = `<span class="error">${result.erro}</span>`;
+                } else {
+                    status.innerHTML = `<span class="error">❌ Resposta inesperada do servidor!</span>`;
+                }
+                
+                listarVideos();
+            } catch (error) {
+                console.error("Erro durante o processamento:", error);
+                loading.style.display = "none";
+                status.innerHTML = `<span class="error">❌ Erro ao processar: ${error.message}</span>`;
+            }
+        }
+
+        async function listarVideos() {
+            try {
+                let response = await fetch("/listar-videos/");
+                
+                if (!response.ok) {
+                    throw new Error(`Erro ${response.status}: ${response.statusText}`);
+                }
+                
+                let data = await response.json();
+                let lista = document.getElementById("videoList");
+
+                lista.innerHTML = "";
+
+                if (!data.videos || data.videos.length === 0) {
+                    lista.innerHTML = "<p>Nenhum vídeo processado ainda.</p>";
+                    return;
+                }
+
+                // Sort videos by name (newest first based on timestamp)
+                data.videos.sort().reverse();
+
+                data.videos.forEach(video => {
+                    let videoUrl = video;
+                    let videoName = video.split('/').pop();
+                    
+                    // Extract version from filename
+                    let version = "Variação Original";
+                    let matchVersion = videoName.match(/_v(\d+)_/);
+                    if (matchVersion) {
+                        version = `Variação ${matchVersion[1]}`;
+                    }
+                    
+                    // Extract date and time if present
+                    let dateMatch = videoName.match(/(\d{2})(\d{2})(\d{4})_(\d{2})(\d{2})(\d{2})/);
+                    let dateStr = "Data desconhecida";
+                    if (dateMatch) {
+                        dateStr = `${dateMatch[1]}/${dateMatch[2]}/${dateMatch[3]} às ${dateMatch[4]}:${dateMatch[5]}`;
+                    }
+                    
+                    let videoElement = document.createElement("div");
+                    videoElement.className = "video-item";
+                    videoElement.innerHTML = `
+                        <div class="video-info">
+                            <div class="video-name">${version}</div>
+                            <div class="video-details">
+                                Processado em: ${dateStr}
+                            </div>
+                        </div>
+                        <a href="${videoUrl}" class="download-btn" download>📥 Baixar</a>
+                    `;
+                    lista.appendChild(videoElement);
+                });
+            } catch (error) {
+                console.error("Erro ao listar vídeos:", error);
+                document.getElementById("videoList").innerHTML = 
+                    `<p class="error">❌ Erro ao carregar vídeos: ${error.message}</p>`;
+            }
+        }
+
+        // Carregar lista de vídeos ao abrir a página
+        window.onload = function() {
+            listarVideos();
+        };
+    </script>
+</body>
+</html>
